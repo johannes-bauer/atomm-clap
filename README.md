@@ -156,79 +156,6 @@ pass them as ordinary function arguments.
 
 ---
 
-## Optional elements
-
-The `+=` operator merges one node's successors and executable into another,
-creating an optional segment in the path.
-
-### Optional flag
-
-```python
-cli.deploy[ENV](deploy, ENV)                    # deploy <env>
-cli.deploy['--dry-run'][ENV](deploy, ENV)       # deploy --dry-run <env>
-cli.deploy += cli.deploy['--dry-run']           # make --dry-run optional
-```
-
-Both `mytool deploy production` and `mytool deploy --dry-run production` now
-work. The handler distinguishes them by checking whether the `'--dry-run'`
-node's symbol appears in `parser_state.matched`.
-
-### Optional `--flag <value>` pair
-
-```python
-HOST = Argument('host')
-
-cli.connect.start(handler, HOST)                     # connect start
-cli.connect['--host'][HOST].start(handler, HOST)     # connect --host <addr> start
-
-# Make the --host <addr> segment skippable
-cli.connect['--host'][HOST] += cli.connect
-```
-
-`HOST.get_value(parser_state)` returns `None` when the segment was not
-traversed.
-
----
-
-## Python reserved words
-
-Some Python keywords appear naturally in CLI paths. Append `_` to use them;
-atomm-clap strips it from the matched token:
-
-| Write | Matches |
-|-------|---------|
-| `cli.list_` or `cli.for_` | `list`, `for` |
-| `cli.type_` | `type` |
-| `cli.raise_` | `raise` |
-
-```python
-cli.scan.for_.ships(scan_ships)   # mytool scan for ships
-cli.alert.raise_(sound_alarm)     # mytool alert raise
-```
-
-### Reserved attribute names
-
-A handful of names are instance attributes of the node class and cannot be
-used as path tokens via attribute access: `name`, `description`, `symbol`,
-`executable`, `hidden`. The most commonly encountered one is `name`.
-
-Use a synonym (`named`, `nickname`, `callsign`, `id`) or subscript syntax as
-a workaround:
-
-```python
-# This silently returns the string 'by', not a subcommand node:
-cli.server.by.name[SERVER]   # ← WRONG
-
-# Use a synonym instead:
-cli.server.by.nickname[SERVER]   # ← OK
-cli.server.named[SERVER]         # ← OK
-
-# Or subscript syntax (less readable):
-cli.server.by['name'][SERVER]    # ← OK
-```
-
----
-
 ## Shell completion
 
 Every `CLI` automatically gains a hidden `completion` subcommand. Source the
@@ -381,6 +308,9 @@ tell.me.about.frogs(tell_me_about_frogs, tell.me['--everything'])
 tell.me['--everything'].about = tell.me.about
 ```
 
+The `+=` operator merges one node's successors and executable into another,
+creating an optional segment in the path.
+
 ```bash
 ### SHELL USAGE 
 $ tell me about frogs
@@ -420,6 +350,43 @@ whatever?!?
 $ counting down ten nine --eight seven six
 Computer: ... five, four, three, two, one.  Have a nice day.
 Everybody: Thank you!
+```
+
+## Python reserved words
+
+Some Python keywords appear naturally in CLI paths. Append `_` to use them;
+atomm-clap strips it from the matched token:
+
+| Write | Matches |
+|-------|---------|
+| `cli.list_` or `cli.for_` | `list`, `for` |
+| `cli.type_` | `type` |
+| `cli.raise_` | `raise` |
+
+```python
+cli.scan.for_.ships(scan_ships)   # mytool scan for ships
+cli.alert.raise_(sound_alarm)     # mytool alert raise
+```
+
+### Reserved attribute names
+
+A handful of names are instance attributes of the node class and cannot be
+used as path tokens via attribute access: `name`, `description`, `symbol`,
+`executable`, `hidden`. The most commonly encountered one is `name`.
+
+Use a synonym (`named`, `nickname`, `callsign`, `id`) or subscript syntax as
+a workaround:
+
+```python
+# This silently returns the string 'by', not a subcommand node:
+cli.server.by.name[SERVER]   # ← WRONG
+
+# Use a synonym instead:
+cli.server.by.nickname[SERVER]   # ← OK
+cli.server.named[SERVER]         # ← OK
+
+# Or subscript syntax (less readable):
+cli.server.by['name'][SERVER]    # ← OK
 ```
 
 ## Decorators
