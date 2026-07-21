@@ -44,8 +44,8 @@ pip install atomc
 Or from source:
 
 ```bash
-git clone https://github.com/johannes-bauer/jutam
-cd jutam
+git clone https://github.com/johannes-bauer/atomm-clap
+cd atomm-clap
 pip install -e .
 ```
 
