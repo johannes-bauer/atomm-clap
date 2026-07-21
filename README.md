@@ -25,12 +25,12 @@ the kind of thing kubectl and the Docker CLI do, where commands read like
 sentences.  atomm-clap could, for example, easily implement
 
 ```bash
-kubectl list <entity> in namespace <namespace> with label <label>`
+kubectl list <entity> in namespace <namespace> with label <label>
 ```
 
 instead of
 ```bash
-kubectl get pods -n <namespace> -l <label-key>=<label-value>`
+kubectl get pods -n <namespace> -l <label-key>=<label-value>
 ```
 
 ---
@@ -38,7 +38,7 @@ kubectl get pods -n <namespace> -l <label-key>=<label-value>`
 ## Installation
 
 ```bash
-pip install atomc
+pip install atomm-clap
 ```
 
 Or from source:
