@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "atomc"
+version = "0.1.0"
+description = "A command-line parser for building deep, complex, readable, memorable CLIs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = []
+authors = [{name = "Johannes Bauer", email = "atomm-clap@interesting-problems.de"}]
+keywords = ["cli", "argument-parser", "subcommands"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://github.com/johannes-bauer/atomm-clap"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
