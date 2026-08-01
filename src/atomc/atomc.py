@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ParserState:
     def __init__(self):
         self.matched_tokens = []
-        self.matched: dict[str, Subcommand] = {}
+        self.matched: dict[str, typing.Any] = {}
         self.states: list[Subcommand] = []
 
     def transition(self, token, next_state):
@@ -69,6 +69,7 @@ class FunctionalSubcommand:
         description: str | None = None,
         add_help_subcommand: bool = True,
         symbol_unique: bool = True,
+        arg_type: typing.Callable[[str], typing.Any] = None,
     ):
         self._successors: typing.Dict[str, FunctionalSubcommand] = {}
         self._atomc_wrapped = wrapped
@@ -81,6 +82,7 @@ class FunctionalSubcommand:
         self._atomc_hidden = hidden
         self._atomc_description = description
         self._atomc_add_help_subcommand = add_help_subcommand
+        self._atomc_arg_type = arg_type
 
         if add_help_subcommand:
             self.set_successor('-h', _help_short)
@@ -122,12 +124,13 @@ class FunctionalSubcommand:
         )
 
     def _atomc_convert_token(self, token: str, state: ParserState):
+        converted = self._atomc_arg_type(token) if self._atomc_arg_type else token
         if self._atomc_repetitions == 1:
-            return token
+            return converted
         elif self._atomc_repetitions == '+' and self._atomc_symbol in state.matched:
-            return state.matched[self._atomc_symbol] + [token]
+            return state.matched[self._atomc_symbol] + [converted]
         elif self._atomc_repetitions == '+':
-            return [token]
+            return [converted]
         else:
             raise ValueError(f"repetitions must be 1 or + but got {self._atomc_repetitions}.")
 
@@ -247,6 +250,7 @@ class Subcommand(FunctionalSubcommand):
         description: str | None = None,
         add_help_subcommand: bool = True,
         symbol_unique=True,
+        arg_type: typing.Callable[[str], typing.Any] = None,
     ):
         super().__init__(
             wrapped,
@@ -259,7 +263,8 @@ class Subcommand(FunctionalSubcommand):
             hidden,
             description,
             add_help_subcommand,
-            symbol_unique
+            symbol_unique,
+            arg_type
         )
         self._initialized = True
 
@@ -325,28 +330,22 @@ class Subcommand(FunctionalSubcommand):
             executable=self._atomc_executable,
             description=self._atomc_description,
             add_help_subcommand=self._atomc_add_help_subcommand,
-            hidden=self._atomc_hidden
+            hidden=self._atomc_hidden,
+            arg_type=self._atomc_arg_type,
         )
         s._successors = dict(self._successors)
         return s
 
 class Argument(Subcommand):
-    def __init__(self, name, *args, arg_type: typing.Callable[[str], typing.Any]=None, **kwargs) -> None:
-        kwargs['name'] = kwargs.get('name', name)
+    def __init__(self, name, *args, **kwargs) -> None:
+        kwargs['name'] = name
         kwargs['target_token'] = kwargs.get('target_token', None)
-        self.arg_type = arg_type
         super().__init__(*args, **kwargs, symbol_unique=False)
 
-    def get_value(self, parser_state: ParserState):
-        value = super().get_value(parser_state)
-        if self.arg_type:
-            value = self.arg_type(value)
-        return value
-
     def _atomc_matches(self, token: str, state: ParserState) -> bool:
-        if self.arg_type:
+        if self.__atomc_arg_type:
             try:
-                self.arg_type(token)
+                self.__atomc_arg_type(token)
                 return True
             except ValueError:
                 return False
@@ -364,7 +363,7 @@ class Argument(Subcommand):
             suggestions=self._atomc_suggestions,
             target_token=self._atomc_target_token,
             executable=self._atomc_executable,
-            arg_type=self.arg_type,
+            arg_type=self.__atomc_arg_type,
         )
         s._successors = dict(self._successors)
         return s
