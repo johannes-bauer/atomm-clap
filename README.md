@@ -379,14 +379,14 @@ a workaround:
 
 ```python
 # This silently returns the string 'by', not a subcommand node:
-cli.server.by.name[SERVER]   # ← WRONG
+cli.server.by._atomc_name[SERVER]  # ← WRONG
 
 # Use a synonym instead:
-cli.server.by.nickname[SERVER]   # ← OK
-cli.server.named[SERVER]         # ← OK
+cli.server.by.nickname[SERVER]  # ← OK
+cli.server.named[SERVER]  # ← OK
 
 # Or subscript syntax (less readable):
-cli.server.by['name'][SERVER]    # ← OK
+cli.server.by['name'][SERVER]  # ← OK
 ```
 
 ## Decorators

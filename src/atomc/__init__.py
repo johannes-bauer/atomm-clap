@@ -2,7 +2,8 @@ from .atomc import (
     parse_tokens,
     Argument,
     ProxyArgument,
-    Subcommand
+    Subcommand,
+    clear
 )
 
 from .completion import add_completion_script_arguments as _add_completion_script_arguments

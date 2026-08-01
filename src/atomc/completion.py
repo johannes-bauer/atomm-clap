@@ -1,11 +1,19 @@
 import sys
 
+SHELL = None
+EXECUTABLE_NAME = None
 
 def add_completion_script_arguments(subcommand):
     from . import atomc
     import random
 
-    def print_completion_script(shell, executable: str):
+    global SHELL
+    global EXECUTABLE_NAME
+    if SHELL is None:
+        SHELL = atomc.Argument('shell')
+        EXECUTABLE_NAME = atomc.Argument('executable_name')
+
+    def print_completion_script(shell: str, executable: str):
         """
 
         :param shell: for which shell to generate a script (currently only 'bash' supported)
@@ -68,12 +76,11 @@ complete -c {executable} -f -a '(_{executable}_{suffix})'
         else:
             raise ValueError(f"Not implemented for shell '{shell}'")
 
-    SHELL = atomc.Argument('shell')
-    EXECUTABLE = atomc.Argument('executable')
+
     subcommand.completion(hidden=True)
-    subcommand.completion[SHELL][EXECUTABLE](
+    subcommand.completion[SHELL][EXECUTABLE_NAME](
         print_completion_script,
         SHELL,
-        EXECUTABLE,
+        EXECUTABLE_NAME,
         hidden=True
     )

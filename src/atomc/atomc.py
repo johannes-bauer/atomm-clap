@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import keyword
 import typing
 import shlex
@@ -20,7 +21,7 @@ class ParserState:
 
     def transition(self, token, next_state):
         self.matched_tokens.append(token)
-        self.matched[next_state.symbol] = next_state.convert_token(token, self)
+        self.matched[next_state._atomc_symbol] = next_state._atomc_convert_token(token, self)
         self.states.append(next_state)
 
 
@@ -33,15 +34,26 @@ def _un_keyword(token: str):
 
 
 _symbols = set()
-def symbol(name: str):
+def symbol(name: str, unique=False):
     assert isinstance(name, str), name
-    s = f'{name}_0000'
-    i = 0
-    while s in _symbols:
-        s = f'{name}_{i:04d}'
-        i += 1
-    _symbols.add(s)
-    return s
+    if unique:
+        s = f'___unique_symbol_{name}_0000'
+        i = 0
+        while s in _symbols:
+            s = f'{name}_{i:04d}'
+            i += 1
+        _symbols.add(s)
+        return s
+    else:
+        _symbols.add(name)
+        return name
+
+
+def clear():
+    """Clear all state.  Mainly used in tests."""
+    global _symbols
+    _symbols = set()
+
 
 class FunctionalSubcommand:
     def __init__(
@@ -56,18 +68,19 @@ class FunctionalSubcommand:
         hidden = False,
         description: str | None = None,
         add_help_subcommand: bool = True,
+        symbol_unique: bool = True,
     ):
         self._successors: typing.Dict[str, FunctionalSubcommand] = {}
-        self.wrapped = wrapped
-        self.repetitions = repetitions
-        self.suggestions = suggestions
-        self.symbol = copied_from.symbol if copied_from else symbol(name)
-        self.name = name or target_token
-        self.target_token = target_token
-        self.executable = executable
-        self.hidden = hidden
-        self.description = description
-        self.add_help_subcommand = add_help_subcommand
+        self._atomc_wrapped = wrapped
+        self._atomc_repetitions = repetitions
+        self._atomc_suggestions = suggestions
+        self._atomc_symbol = copied_from._atomc_symbol if copied_from else symbol(name, symbol_unique)
+        self._atomc_name = name or target_token
+        self._atomc_target_token = target_token
+        self._atomc_executable = executable
+        self._atomc_hidden = hidden
+        self._atomc_description = description
+        self._atomc_add_help_subcommand = add_help_subcommand
 
         if add_help_subcommand:
             self.set_successor('-h', _help_short)
@@ -78,130 +91,130 @@ class FunctionalSubcommand:
         return successor
 
     def get_value(self, parser_state: ParserState):
-        value = parser_state.matched.get(self.symbol, None)
+        value = parser_state.matched.get(self._atomc_symbol, None)
         return value
 
     def __iadd__(self, other: FunctionalSubcommand):
         self._successors.update(other._successors)
-        self.executable = other.executable
+        self._atomc_executable = other._atomc_executable
         return self
 
-    def transition(self, token, state: ParserState) -> FunctionalSubcommand:
-        next_state = self.next_state(token, state)
+    def _atomc_transition(self, token, state: ParserState) -> FunctionalSubcommand:
+        next_state = self._atomc_next_state(token, state)
         state.transition(token, next_state)
         return next_state
 
-    def next_state(self, token: str, state: ParserState) -> FunctionalSubcommand:
+    def _atomc_next_state(self, token: str, state: ParserState) -> FunctionalSubcommand:
         candidates = list(self._successors.values())
-        if self.repetitions == '+':
+        if self._atomc_repetitions == '+':
             candidates += [self]
         for handler in candidates:
-            if handler.matches(token, state):
+            if handler._atomc_matches(token, state):
                 return handler
         suggestions = ', '.join([
             s
             for handler in candidates
-            for s in handler.next_token_suggestions(token, state)
+            for s in handler._atomc_next_token_suggestions(token, state)
         ])
         matched_tokens = ' '.join(state.matched_tokens)
         raise NoSuchSubcommandException(
             f"No match found for last token '{token}' after '{matched_tokens}'.  Suggestions: {suggestions}"
         )
 
-    def convert_token(self, token: str, state: ParserState):
-        if self.repetitions == 1:
+    def _atomc_convert_token(self, token: str, state: ParserState):
+        if self._atomc_repetitions == 1:
             return token
-        elif self.repetitions == '+' and self.symbol in state.matched:
-            return state.matched[self.symbol] + [token]
-        elif self.repetitions == '+':
+        elif self._atomc_repetitions == '+' and self._atomc_symbol in state.matched:
+            return state.matched[self._atomc_symbol] + [token]
+        elif self._atomc_repetitions == '+':
             return [token]
         else:
-            raise ValueError(f"repetitions must be 1 or + but got {self.repetitions}.")
+            raise ValueError(f"repetitions must be 1 or + but got {self._atomc_repetitions}.")
 
-    def this_token_suggestions(self, token: str, state: ParserState, only_cheap_suggestions: bool = False):
+    def _atomc_this_token_suggestions(self, token: str, state: ParserState, only_cheap_suggestions: bool = False):
         tokens = []
-        if isinstance(self.suggestions, list):
-            tokens = [str(s) for s in self.suggestions]
-        elif not only_cheap_suggestions and self.suggestions is not None:
-            tokens = self.suggestions(token, state)
-        elif self.target_token:
-            tokens = [self.target_token]
+        if isinstance(self._atomc_suggestions, list):
+            tokens = [str(s) for s in self._atomc_suggestions]
+        elif not only_cheap_suggestions and self._atomc_suggestions is not None:
+            tokens = self._atomc_suggestions(token, state)
+        elif self._atomc_target_token:
+            tokens = [self._atomc_target_token]
         tokens = [t for t in tokens if t.startswith(token)]
-        if (len(tokens) == 1) and (next_tokens := self.next_token_suggestions(tokens[0], state, True)):
+        if (len(tokens) == 1) and (next_tokens := self._atomc_next_token_suggestions(tokens[0], state, True)):
             tokens = [
                 tokens[0] + ' ' + nt for nt in next_tokens
             ]
         return tokens
 
-    def next_token_suggestions(self, token, state: ParserState, only_cheap_suggestions: bool = False):
+    def _atomc_next_token_suggestions(self, token, state: ParserState, only_cheap_suggestions: bool = False):
         return [
             s
             for successor in self._successors.values()
-            if not successor.hidden
-            for s in successor.this_token_suggestions(token, state, only_cheap_suggestions)
+            if not successor._atomc_hidden
+            for s in successor._atomc_this_token_suggestions(token, state, only_cheap_suggestions)
         ]
 
-    def matches(self, token, state: ParserState) -> bool:
-        return token == self.target_token
+    def _atomc_matches(self, token, state: ParserState) -> bool:
+        return token == self._atomc_target_token
 
-    def is_final_state(self):
-        return self.executable is not None
+    def _atomc_is_final_state(self):
+        return self._atomc_executable is not None
 
-    def execute(self, parser_state: ParserState):
-        if self.is_final_state():
-            self.executable(parser_state)
+    def _atomc_execute(self, parser_state: ParserState):
+        if self._atomc_is_final_state():
+            self._atomc_executable(parser_state)
         else:
             raise ValueError("Not a final state.")
 
-    def print_help(self, prefix):
-        if self.description:
-            cli.echo(self.description, stderr=True)
+    def _atomc_print_help(self, prefix):
+        if self._atomc_description:
+            cli.echo(self._atomc_description, stderr=True)
         options = []
         def to_string(c):
-            return f'[{c.name}]' if not c.target_token else c.target_token
+            return f'[{c._atomc_name}]' if not c._atomc_target_token else c._atomc_target_token
         partial_options = [(o, prefix + to_string(o)) for o in self._successors.values()]
         while partial_options:
             _new_partial_options = []
             for option, option_string in partial_options:
                 if len(option_string) < 70 and option._successors:
                     for s in option._successors.values():
-                        if not s.hidden:
+                        if not s._atomc_hidden:
                             _new_partial_options.append([s, option_string + ' ' + to_string(s)])
                 elif option._successors:
                     options.append(option_string + ' ...')
 
-                if option.executable and not option.hidden:
+                if option._atomc_executable and not option._atomc_hidden:
                     options.append(option_string)
             partial_options = _new_partial_options
         options = '\n   '.join(sorted(set(options)))
         if options:
-            if self.description:
+            if self._atomc_description:
                 cli.echo('', stderr=True)
             cli.echo('Usage:', stderr=True)
             cli.echo('   ' + options, stderr=True)
 
     def __repr__(self):
-        return f'subcommand({self.target_token})'
+        return f'subcommand({self._atomc_target_token})'
 
     def __call__(self, call=None, *args, **kwargs):
         if call is not None:
             if isinstance(call, _Call):
-                self.executable = call
+                self._atomc_executable = call
             else:
-                self.executable = _Call(call, *(args))
+                self._atomc_executable = _Call(call, *(args))
         if 'suggestions' in kwargs:
-            self.suggestions = kwargs['suggestions']
+            self._atomc_suggestions = kwargs['suggestions']
 
         if 'description' in kwargs:
-            self.description = kwargs['description']
+            self._atomc_description = kwargs['description']
         elif call is not None and getattr(call, '__doc__', None) is not None:
-            self.description = call.__doc__
+            self._atomc_description = call.__doc__
 
         if 'hidden' in kwargs:
-            self.hidden = kwargs['hidden']
+            self._atomc_hidden = kwargs['hidden']
 
 def _print_help(parser_state: ParserState):
-    parser_state.states[-2].print_help(
+    parser_state.states[-2]._atomc_print_help(
         ' '.join(parser_state.matched_tokens[:-1]) + ' '
     )
 
@@ -232,7 +245,8 @@ class Subcommand(FunctionalSubcommand):
         executable: typing.Callable = None,
         hidden = False,
         description: str | None = None,
-        add_help_subcommand: bool = True
+        add_help_subcommand: bool = True,
+        symbol_unique=True,
     ):
         super().__init__(
             wrapped,
@@ -245,6 +259,7 @@ class Subcommand(FunctionalSubcommand):
             hidden,
             description,
             add_help_subcommand,
+            symbol_unique
         )
         self._initialized = True
 
@@ -288,29 +303,29 @@ class Subcommand(FunctionalSubcommand):
         if isinstance(item, str):
             return self.__getattr__(item)
         else:
-            if item.symbol not in self._successors:
-                self.__setattr__(item.symbol, item)
-            return self.__getitem__(item.symbol)
+            if item._atomc_symbol not in self._successors:
+                self.__setattr__(item._atomc_symbol, item)
+            return self.__getitem__(item._atomc_symbol)
 
     def __setitem__(self, key: str | Subcommand, value):
         logger.debug(f'setitem {key}, {value}')
         if isinstance(key, str):
             return self.__setattr__(key, value)
         else:
-            return self.__setattr__(key.symbol, value)
+            return self.__setattr__(key._atomc_symbol, value)
 
     def copy(self):
         s = Subcommand(
-            wrapped=self.wrapped,
-            repetitions=self.repetitions,
-            suggestions=self.suggestions,
-            target_token=self.target_token,
+            wrapped=self._atomc_wrapped,
+            repetitions=self._atomc_repetitions,
+            suggestions=self._atomc_suggestions,
+            target_token=self._atomc_target_token,
             copied_from=self,
-            name=self.name,
-            executable=self.executable,
-            description=self.description,
-            add_help_subcommand=self.add_help_subcommand,
-            hidden=self.hidden
+            name=self._atomc_name,
+            executable=self._atomc_executable,
+            description=self._atomc_description,
+            add_help_subcommand=self._atomc_add_help_subcommand,
+            hidden=self._atomc_hidden
         )
         s._successors = dict(self._successors)
         return s
@@ -320,7 +335,7 @@ class Argument(Subcommand):
         kwargs['name'] = kwargs.get('name', name)
         kwargs['target_token'] = kwargs.get('target_token', None)
         self.arg_type = arg_type
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, symbol_unique=False)
 
     def get_value(self, parser_state: ParserState):
         value = super().get_value(parser_state)
@@ -328,7 +343,7 @@ class Argument(Subcommand):
             value = self.arg_type(value)
         return value
 
-    def matches(self, token: str, state: ParserState) -> bool:
+    def _atomc_matches(self, token: str, state: ParserState) -> bool:
         if self.arg_type:
             try:
                 self.arg_type(token)
@@ -338,17 +353,17 @@ class Argument(Subcommand):
         return True
 
     def __repr__(self):
-        return f'arg({self.name})'
+        return f'arg({self._atomc_name})'
 
     def copy(self):
         s = Argument(
-            name=self.name,
+            name=self._atomc_name,
             copied_from=self,
-            repetitions=self.repetitions,
-            wrapped=self.wrapped,
-            suggestions=self.suggestions,
-            target_token=self.target_token,
-            executable=self.executable,
+            repetitions=self._atomc_repetitions,
+            wrapped=self._atomc_wrapped,
+            suggestions=self._atomc_suggestions,
+            target_token=self._atomc_target_token,
+            executable=self._atomc_executable,
             arg_type=self.arg_type,
         )
         s._successors = dict(self._successors)
@@ -388,7 +403,7 @@ def parse_tokens(inital_state: Subcommand, tokens: list[str]):
 
     try:
         for token in tokens:
-            current_state = current_state.transition(token, parser_state)
+            current_state = current_state._atomc_transition(token, parser_state)
     except NoSuchSubcommandException as e:
         error(str(e))
         return None
@@ -398,13 +413,13 @@ def parse_tokens(inital_state: Subcommand, tokens: list[str]):
             f"Completing item '{completable}', which is at index {completion_item_idx} "
             f"of original tokens {original_tokens}."
         )
-        suggestions = current_state.next_token_suggestions(completable, parser_state)
+        suggestions = current_state._atomc_next_token_suggestions(completable, parser_state)
         prefix = []
 
-        while len(suggestions) == 1 and not current_state.is_final_state():
+        while len(suggestions) == 1 and not current_state._atomc_is_final_state():
             prefix.append(suggestions[0])
-            current_state = current_state.transition(suggestions[0], parser_state)
-            suggestions = current_state.next_token_suggestions('', parser_state)
+            current_state = current_state._atomc_transition(suggestions[0], parser_state)
+            suggestions = current_state._atomc_next_token_suggestions('', parser_state)
 
         if prefix:
             tokens = prefix
@@ -415,7 +430,7 @@ def parse_tokens(inital_state: Subcommand, tokens: list[str]):
             line = '\n'.join(shlex.quote(s) for s in suggestions)
             print(line)
     else:
-        current_state.execute(parser_state)
+        current_state._atomc_execute(parser_state)
 
 
 def call(fn, *args):
@@ -458,15 +473,36 @@ class NoSuchSubcommandException(Exception):
     pass
 
 class _Call:
-    def __init__(self, fn, *args):
+    def __init__(self, fn: typing.Callable, *args):
         self.fn = fn
-        self.args = args
+        if args:
+            self.args = args
+            self.arg_names = []
+        else:
+            self.args = ()
+            argspec = inspect.getfullargspec(fn)
+            self.arg_names = argspec.args
 
-    def __call__(self, matched: dict[Subcommand, list[typing.Any]]):
-        arguments = [
-            arg.get_value(matched) if hasattr(arg, 'get_value') else arg
-            for arg in self.args
-        ]
-        stargs = ', '.join([str(a) for a in arguments])
-        logger.debug(f"Calling {self.fn.__name__}({stargs})")
-        return self.fn(*arguments)
+
+
+    def __call__(self, matched: ParserState):
+        args = []
+        kwargs = {}
+        if self.args:
+            args = [
+                arg.get_value(matched) if hasattr(arg, 'get_value') else arg
+                for arg in self.args
+            ]
+        else:
+            kwargs = {
+                name: matched.matched[name]
+                for name in self.arg_names
+            }
+
+        stargs = ', '.join(
+            [str(a) for a in args]
+            + [f'{key}={value}' for key, value in kwargs.items()]
+        )
+
+        logger.debug(f"Calling {self.fn.__name__}({stargs}, )")
+        return self.fn(*args, **kwargs)

@@ -1,5 +1,6 @@
 def test_smoketest():
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     smoketest = CLI('smoketest')
 
@@ -17,7 +18,8 @@ def test_smoketest():
 
 
 def test_simple_variables():
-    from atomc import CLI, parse_tokens, Argument
+    from atomc import CLI, parse_tokens, Argument, clear
+    clear()
 
     RED = Argument('red')
     BLUE = Argument('blue')
@@ -39,8 +41,47 @@ def test_simple_variables():
     assert called_width == ['ReD', 'BlUe']
 
 
+def test_can_have_one_argument_after_another():
+    from atomc import CLI, parse_tokens, Argument, clear
+    clear()
+
+    one = CLI('one')
+    called_width = []
+    def did_it(*args):
+        called_width.extend(args)
+
+    SHELL = Argument('shell')
+    EXECUTABLE = Argument('three')
+
+    one.two[SHELL][EXECUTABLE](did_it, SHELL, EXECUTABLE)
+
+    parse_tokens(one, ['one', 'two', 'three', 'four'])
+
+    assert called_width == ['three', 'four']
+
+
+def test_named_args_are_inferred():
+    from atomc import CLI, Argument, parse_tokens, clear
+    clear()
+
+    one = CLI('one')
+
+    THREE = Argument('three')
+
+    called_width = []
+    def did_it(three):
+        called_width.append(three)
+
+    one.two[THREE].four(call=did_it)
+
+    parse_tokens(one, ['one', 'two', '3', 'four'])
+
+    assert called_width == ['3']
+
+
 def test_converted_variables():
-    from atomc import CLI, parse_tokens, Argument
+    from atomc import CLI, parse_tokens, Argument, clear
+    clear()
 
     TWO = Argument('two', arg_type=int)
     RED = Argument('red')
@@ -66,7 +107,8 @@ def test_converted_variables():
 
 
 def test_bash_completion():
-    from atomc import CLI, parse_tokens, Argument
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     one = CLI('one')
     one.two()
@@ -78,7 +120,8 @@ def test_bash_builds_friendly_function(capsys):
 
     import sys
     import __main__
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     one = CLI('one')
     one.two()
@@ -102,7 +145,8 @@ def test_zsh_builds_friendly_function(capsys):
 
     import sys
     import __main__
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     one = CLI('one')
     one.two()
@@ -125,7 +169,8 @@ def test_fish_builds_friendly_function(capsys):
 
     import sys
     import __main__
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     one = CLI('one')
     one.two()
@@ -144,7 +189,8 @@ def test_fish_builds_friendly_function(capsys):
 
 
 def test_help_prints_description(capsys):
-    from atomc import CLI, parse_tokens, Argument
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     one = CLI('one')
     one.two(description='three, four')
@@ -155,7 +201,8 @@ def test_help_prints_description(capsys):
 
 
 def test_help_prints_docstring(capsys):
-    from atomc import CLI, parse_tokens, Argument
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     def the_function():
         """This is a function with a docstring"""
@@ -172,7 +219,8 @@ def test_help_prints_docstring(capsys):
 def test_help_prints_usage(capsys, monkeypatch):
     monkeypatch.setenv('_ATOMC_EXECUTABLE_FUNCTION_NAME', 'executable_name')
 
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     def dummy():
         pass
@@ -187,7 +235,8 @@ def test_help_prints_usage(capsys, monkeypatch):
 def test_help_prints_previously_matched(capsys, monkeypatch):
     monkeypatch.setenv('_ATOMC_EXECUTABLE_FUNCTION_NAME', 'executable_name')
 
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     def dummy():
         pass
@@ -201,7 +250,8 @@ def test_help_prints_previously_matched(capsys, monkeypatch):
 
 
 def test_completion_completes_second_final_token(capsys):
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     def dummy():
         pass
@@ -215,7 +265,8 @@ def test_completion_completes_second_final_token(capsys):
 
 
 def test_completion_completes_fourth_final_token(capsys):
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     def dummy():
         pass
@@ -228,7 +279,8 @@ def test_completion_completes_fourth_final_token(capsys):
     assert capsys.readouterr().out == 'seven\n'
 
 def test_completion_completes_empty_token(capsys):
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     def dummy():
         pass
@@ -242,7 +294,8 @@ def test_completion_completes_empty_token(capsys):
 
 
 def test_completion_completes_multiple_tokens(capsys):
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     def dummy():
         pass
@@ -256,7 +309,8 @@ def test_completion_completes_multiple_tokens(capsys):
 
 
 def test_optional_subcommands_are_optional():
-    from atomc import CLI, parse_tokens
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     giving = CLI('giving')
 
@@ -277,7 +331,8 @@ def test_optional_subcommands_are_optional():
 
 
 def test_optional_dash_dash_arguments_are_optional():
-    from atomc import CLI, parse_tokens, Argument
+    from atomc import CLI, parse_tokens, Argument, clear
+    clear()
 
     ARGH = Argument('ARGH')
 
@@ -300,7 +355,8 @@ def test_optional_dash_dash_arguments_are_optional():
 
 
 def test_decorator():
-    from atomc import CLI, parse_tokens, Argument
+    from atomc import CLI, parse_tokens, clear
+    clear()
 
     decorated = CLI('beautiful')
 
