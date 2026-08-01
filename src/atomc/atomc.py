@@ -343,9 +343,9 @@ class Argument(Subcommand):
         super().__init__(*args, **kwargs, symbol_unique=False)
 
     def _atomc_matches(self, token: str, state: ParserState) -> bool:
-        if self.__atomc_arg_type:
+        if self._atomc_arg_type:
             try:
-                self.__atomc_arg_type(token)
+                self._atomc_arg_type(token)
                 return True
             except ValueError:
                 return False
@@ -363,7 +363,7 @@ class Argument(Subcommand):
             suggestions=self._atomc_suggestions,
             target_token=self._atomc_target_token,
             executable=self._atomc_executable,
-            arg_type=self.__atomc_arg_type,
+            arg_type=self._atomc_arg_type,
         )
         s._successors = dict(self._successors)
         return s
