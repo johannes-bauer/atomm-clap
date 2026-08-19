@@ -95,8 +95,7 @@ cli.server.list(list_servers)          # mytool server list
 cli.server.restart(restart_server)     # mytool server restart
 ```
 
-Handlers are plain callables with no arguments; values are passed explicitly
-(see below).
+How matched values are delivered to handlers is covered below.
 
 ### Arguments
 
@@ -106,53 +105,74 @@ the value. Use square-bracket syntax to place it in the path:
 ```python
 SERVER = Argument('server')
 PORT   = Argument('port', arg_type=int)
-
-cli.server[SERVER].show(show_server, SERVER)          # mytool server <name> show
-cli.server[SERVER].set.port[PORT](set_port, SERVER, PORT)  # mytool server <name> set port <n>
 ```
 
-When a handler is called, `Argument` objects passed after the callable are
-resolved to their matched values:
-
-```python
-def show_server(server_name):
-    print(f"Showing {server_name}")
-
-cli.server[SERVER].show(show_server, SERVER)
-```
-
-`arg_type` converts the raw string before passing it to the handler:
+`arg_type` restricts matching to tokens that can be converted and delivers the
+converted value to the handler:
 
 ```python
 COUNT = Argument('count', arg_type=int)
-cli.run[COUNT].times(handler, COUNT)   # COUNT.get_value() returns an int
+cli.run[COUNT].times(handler, COUNT)   # only integers match; handler receives an int
 ```
 
-### Handlers can be plain functions or lambdas
+### Handlers
+
+Handlers are plain callables — functions or lambdas. There are two ways to
+pass matched `Argument` values to a handler.
+
+**Explicit:** list `Argument` objects after the callable. The function
+parameter names can be anything:
 
 ```python
 cli.status(lambda: print("OK"))
 
-def do_deploy(env, version):
-    ...
+SERVER = Argument('server')
+PORT   = Argument('port', arg_type=int)
 
+def show_server(srv):
+    print(f"Showing {srv}")
+
+cli.server[SERVER].show(show_server, SERVER)               # mytool server <name> show
+cli.server[SERVER].set.port[PORT](set_port, SERVER, PORT)  # mytool server <name> set port <n>
+```
+
+**Inferred:** pass the handler with `call=` and name each parameter to match
+the corresponding `Argument` name. atomm-clap reads the parameter names with
+`inspect` and maps them automatically:
+
+```python
+def show_server(server):    # 'server' matches Argument('server')
+    print(f"Showing {server}")
+
+cli.server[SERVER].show(call=show_server)
+```
+
+Both forms handle multiple arguments the same way:
+
+```python
 ENV     = Argument('env')
 VERSION = Argument('version')
-cli.deploy[ENV].version[VERSION](do_deploy, ENV, VERSION)
+
+def do_deploy(env, version): ...
+
+cli.deploy[ENV].version[VERSION](do_deploy, ENV, VERSION)   # explicit
+cli.deploy[ENV].version[VERSION](call=do_deploy)             # inferred
 ```
+
+Prefer `call=` when parameter names naturally match `Argument` names — it
+keeps path definitions concise and avoids repeating `Argument` objects.
 
 ### Accessing matched values directly
 
-From inside a handler that receives `parser_state`, call `ARG.get_value(parser_state)`:
+As a lower-level alternative, a handler can accept the raw parser state and
+call `ARG.get_value(parser_state)` to retrieve values:
 
 ```python
 def handler(parser_state):
     server = SERVER.get_value(parser_state)
 ```
 
-Argument objects passed as positional arguments after the callable (as shown
-above) are the more common pattern — they let the library extract values and
-pass them as ordinary function arguments.
+This is rarely needed — the explicit and `call=` forms cover the common cases.
 
 ---
 
@@ -390,25 +410,28 @@ cli.server.by['name'][SERVER]  # ← OK
 ```
 
 ## Decorators
-Some of the popular commandline parser libraries provide functionality to add decorators to functions to turn those
-functions into CLI commands.  atomm-clap accidentally provides limited support for this pattern:
+
+Decorating a function with a CLI node is equivalent to calling it with `call=`,
+so argument auto-inference always applies:
 
 ```python
-### CLI DEFINITION
+ENV     = Argument('env')
+VERSION = Argument('version')
 
-decorated = CLI('beautiful')
+@cli.deploy[ENV].version[VERSION]
+def do_deploy(env, version):    # parameter names matched to Argument names automatically
+    ...
 
-@decorated.function
-def dec_fun():
-    print("I'm pretty!")
+# Exactly equivalent to:
+cli.deploy[ENV].version[VERSION](call=do_deploy)
 ```
 
-That said, the idea behind atomm-clap is to define a CLI as one readable list of command patterns that can be checked 
-quickly by a developer to understand a CLI's capabilities and find entrypoints into the actual application.
-A source code file with many non-trivial, decorated functions arguably doesn't serve that purpose as well as a sequence
-of command definitions.
+That said, atomm-clap is designed for CLI definitions that read as a compact,
+scannable list of command paths — the decorator form scatters that list across
+the module alongside the handler implementations. A flat sequence of path
+definitions is easier to audit and find entry points in.
 
-It will often also introduce performance issues, see [below](#Performance). 
+Decorators can also introduce performance issues (see [below](#Performance)).
 
 
 ## Performance
